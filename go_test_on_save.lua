@@ -1,3 +1,4 @@
+M = {}
 require("config.util_find_func")
 require("config.util_go_test_on_save")
 
@@ -92,7 +93,8 @@ local on_exit_fn = function(test_state, bufnr)
 	vim.diagnostic.set(attach_instace.ns, bufnr, failed, {})
 end
 
-local attach_to_buffer = function(bufnr, command)
+---@param command string
+M.attach_to_buffer = function(bufnr, command)
 	local test_state = {
 		bufnr = bufnr,
 		tests = {},
@@ -217,47 +219,23 @@ local attach_all_go_test_in_buf = function()
 		concatTestName = concatTestName .. testName .. "|"
 	end
 	concatTestName = concatTestName:sub(1, -2) -- remove the last |
-	local command = { "go", "test", "./...", "-json", "-v", "-run", string.format("%s", concatTestName) }
+	local command_str = string.format("go test ./... -json -v -run %s", concatTestName)
 	new_attach_instance()
-	attach_to_buffer(bufnr, command)
+	M.attach_to_buffer(bufnr, command_str)
 end
 
 local attach_go_test = function()
 	clear_group_ns()
 	local test_name = Get_enclosing_test()
 	make_notify(string.format("Attaching test: %s", test_name))
-	local command = { "go", "test", "./...", "-json", "-v", "-run", test_name }
-	new_attach_instance()
-	attach_to_buffer(vim.api.nvim_get_current_buf(), command)
-end
+	local command_str = string.format("go test ./... -json -v -run %s", test_name)
 
-local function drive_test_command()
-	local test_name = Get_enclosing_test()
-	make_notify(string.format("Attaching drive test: %s", test_name))
-	local command = { "go", "test", "./integration_tests/*.go", "-json", "-v", "-run", test_name }
-	local command_str = string.format("go test integration_tests/*.go -json -v -run %s", test_name)
-	return command_str
-end
-
-local function drive_test_on_save_dev()
-	vim.env.UKS = "others"
-	vim.env.MODE = "dev"
 	new_attach_instance()
-	attach_to_buffer(vim.api.nvim_get_current_buf(), drive_test_command())
-end
-
-local function drive_test_on_save_staging()
-	vim.env.UKS = "others"
-	vim.env.MODE = "staging"
-	new_attach_instance()
-	attach_to_buffer(vim.api.nvim_get_current_buf(), drive_test_command())
+	M.attach_to_buffer(vim.api.nvim_get_current_buf(), command_str)
 end
 
 vim.api.nvim_create_user_command("GoTestClear", clear_group_ns, {})
-vim.api.nvim_create_user_command("DriveTestOnSaveDev", drive_test_on_save_dev, {})
-vim.api.nvim_create_user_command("DriveTestOnSaveStaging", drive_test_on_save_staging, {})
 vim.api.nvim_create_user_command("GoTestOnSave", attach_go_test, {})
 vim.api.nvim_create_user_command("GoTestOnSaveBuf", attach_all_go_test_in_buf, {})
-vim.keymap.set("n", "<leader>gt", attach_go_test, { desc = "[T]oggle [G]o Test on save" })
 
-return {}
+return M
