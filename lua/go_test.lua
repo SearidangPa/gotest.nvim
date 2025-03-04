@@ -92,7 +92,7 @@ local on_exit_fn = function(test_state, bufnr)
 	vim.diagnostic.set(attach_instace.ns, bufnr, failed, {})
 end
 
-M.start_test = function(command, test_state, bufnr, extmark_ids)
+local start_test = function(command, test_state, bufnr, extmark_ids)
 	return vim.fn.jobstart(command, {
 		shell = true,
 		stdout_buffered = true,
@@ -164,12 +164,12 @@ M.start_test = function(command, test_state, bufnr, extmark_ids)
 	})
 end
 
-M.new_attach_instance = function()
+local new_attach_instance = function()
 	attach_instace.group = vim.api.nvim_create_augroup(group_name, { clear = true })
 	attach_instace.ns = vim.api.nvim_create_namespace(ns_name)
 end
 
-M.clear_group_ns = function()
+local clear_group_ns = function()
 	if attach_instace.group == nil or attach_instace.ns == nil then
 		return
 	end
@@ -182,9 +182,9 @@ M.clear_group_ns = function()
 	vim.diagnostic.reset()
 end
 
-M.start_new_test = function(bufnr, command)
-	M.clear_group_ns()
-	M.new_attach_instance()
+local start_new_test = function(bufnr, command)
+	clear_group_ns()
+	new_attach_instance()
 
 	local test_state = {
 		bufnr = bufnr,
@@ -204,7 +204,7 @@ M.start_new_test = function(bufnr, command)
 
 	local extmark_ids = {}
 	Clean_up_prev_job(attach_instace.job_id)
-	attach_instace.job_id = M.start_test(command, test_state, bufnr, extmark_ids)
+	attach_instace.job_id = start_test(command, test_state, bufnr, extmark_ids)
 end
 
 local test_all_in_buf = function()
@@ -216,7 +216,7 @@ local test_all_in_buf = function()
 	end
 	concatTestName = concatTestName:sub(1, -2) -- remove the last |
 	local command_str = string.format("go test ./... -json -v -run %s", concatTestName)
-	M.start_new_test(bufnr, command_str)
+	start_new_test(bufnr, command_str)
 end
 
 local go_test = function()
@@ -224,7 +224,7 @@ local go_test = function()
 	make_notify(string.format("Attaching test: %s", test_name))
 	local command_str = string.format("go test ./... -json -v -run %s", test_name)
 
-	M.start_new_test(vim.api.nvim_get_current_buf(), command_str)
+	start_new_test(vim.api.nvim_get_current_buf(), command_str)
 end
 
 vim.api.nvim_create_user_command("GoTest", go_test, {})
