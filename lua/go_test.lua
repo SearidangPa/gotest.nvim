@@ -1,7 +1,6 @@
 M = {}
-
-require("config.util_find_func")
-require("config.util_go_test_on_save")
+require("util_find_func")
+require("util_go_test_on_save")
 
 local mini_notify = require("mini.notify")
 local make_notify = mini_notify.make_notify({})
@@ -165,8 +164,28 @@ M.start_test = function(command, test_state, bufnr, extmark_ids)
 	})
 end
 
----@param command string
+M.new_attach_instance = function()
+	attach_instace.group = vim.api.nvim_create_augroup(group_name, { clear = true })
+	attach_instace.ns = vim.api.nvim_create_namespace(ns_name)
+end
+
+M.clear_group_ns = function()
+	if attach_instace.group == nil or attach_instace.ns == nil then
+		return
+	end
+	local ok, _ = pcall(vim.api.nvim_get_autocmds, { group = group_name })
+	if not ok then
+		return
+	end
+	vim.api.nvim_del_augroup_by_name(group_name)
+	vim.api.nvim_buf_clear_namespace(vim.api.nvim_get_current_buf(), attach_instace.ns, 0, -1)
+	vim.diagnostic.reset()
+end
+
 M.start_new_test = function(bufnr, command)
+	M.clear_group_ns()
+	M.new_attach_instance()
+
 	local test_state = {
 		bufnr = bufnr,
 		tests = {},
@@ -181,33 +200,14 @@ M.start_new_test = function(bufnr, command)
 	end, {})
 	vim.keymap.set("n", "<leader>to", function()
 		Toggle_test_output(test_state, win_state)
-	end, { desc = "Test [O]utput", buffer = bufnr })
+	end, { desc = "Test [O]utput" })
 
 	local extmark_ids = {}
 	Clean_up_prev_job(attach_instace.job_id)
 	attach_instace.job_id = M.start_test(command, test_state, bufnr, extmark_ids)
 end
 
-local clear_group_ns = function()
-	if attach_instace.group == nil or attach_instace.ns == nil then
-		return
-	end
-	local ok, _ = pcall(vim.api.nvim_get_autocmds, { group = group_name })
-	if not ok then
-		return
-	end
-	vim.api.nvim_del_augroup_by_name(group_name)
-	vim.api.nvim_buf_clear_namespace(vim.api.nvim_get_current_buf(), attach_instace.ns, 0, -1)
-	vim.diagnostic.reset()
-end
-
-local new_attach_instance = function()
-	attach_instace.group = vim.api.nvim_create_augroup(group_name, { clear = true })
-	attach_instace.ns = vim.api.nvim_create_namespace(ns_name)
-end
-
-local attach_all_go_test_in_buf = function()
-	clear_group_ns()
+local test_all_in_buf = function()
 	local bufnr = vim.api.nvim_get_current_buf()
 	local testsInCurrBuf = Find_all_tests(bufnr)
 	local concatTestName = ""
@@ -216,23 +216,20 @@ local attach_all_go_test_in_buf = function()
 	end
 	concatTestName = concatTestName:sub(1, -2) -- remove the last |
 	local command_str = string.format("go test ./... -json -v -run %s", concatTestName)
-	new_attach_instance()
 	M.start_new_test(bufnr, command_str)
 end
 
-local attach_go_test = function()
-	clear_group_ns()
+local go_test = function()
 	local test_name = Get_enclosing_test()
 	make_notify(string.format("Attaching test: %s", test_name))
 	local command_str = string.format("go test ./... -json -v -run %s", test_name)
 
-	new_attach_instance()
 	M.start_new_test(vim.api.nvim_get_current_buf(), command_str)
 end
 
-M.setup = function()
-	vim.api.nvim_create_user_command("GoTest", attach_go_test, {})
-	vim.api.nvim_create_user_command("GoTestBuf", attach_all_go_test_in_buf, {})
-end
+vim.api.nvim_create_user_command("GoTest", go_test, {})
+vim.api.nvim_create_user_command("GoTestBuf", test_all_in_buf, {})
+
+M.setup = function() end
 
 return M
